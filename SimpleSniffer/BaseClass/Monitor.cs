@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
@@ -9,7 +9,7 @@ namespace SimpleSniffer.BaseClass
     {
         private const int SECURITY_BUILTIN_DOMAIN_RID = 0x20;
         private const int DOMAIN_ALIAS_RID_ADMINS = 0x220;
-        
+
         private const int IOC_VENDOR = 0x18000000;
         private const int IOC_IN = -2147483648; //0x80000000;
         private const int SIO_RCVALL = IOC_IN | IOC_VENDOR | 1;
@@ -19,24 +19,27 @@ namespace SimpleSniffer.BaseClass
         private Socket monitor_Socket;
         private IPAddress ipAddress;
         private byte[] buffer;
-
-        public Monitor(IPAddress ip) 
+        private PacketBuilder packetBuilder;
+        public Monitor(IPAddress ip)
         {
+            packetBuilder = new PacketBuilder();
             this.ipAddress = ip;
-			this.buffer = new byte[BUF_SIZE];
-		}
-		
-		~Monitor() {
-			stop();
-		}
+            this.buffer = new byte[BUF_SIZE];
+        }
+
+        ~Monitor()
+        {
+            stop();
+        }
 
         public void start()
         {
             if (monitor_Socket == null)
             {
+
                 try
                 {
-                    
+
                     if (ipAddress.AddressFamily == AddressFamily.InterNetwork)
                     {
                         monitor_Socket = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.IP);
@@ -49,7 +52,7 @@ namespace SimpleSniffer.BaseClass
                     monitor_Socket.IOControl(SIO_RCVALL, BitConverter.GetBytes((int)1), null);
                     monitor_Socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(this.OnReceive), null);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     monitor_Socket.Close();
                     monitor_Socket = null;
@@ -60,7 +63,7 @@ namespace SimpleSniffer.BaseClass
 
         public void stop()
         {
-            if(monitor_Socket != null)
+            if (monitor_Socket != null)
             {
                 monitor_Socket.Close();
                 monitor_Socket = null;
@@ -78,12 +81,14 @@ namespace SimpleSniffer.BaseClass
                     Array.Copy(buffer, 0, receivedBuffer, 0, len);
                     try
                     {
-                        Packet packet;
+                        Packet packet =
+                            packetBuilder.Build(receivedBuffer, monitor_Socket);
 
-                        if (monitor_Socket.AddressFamily == AddressFamily.InterNetwork)
-                           packet = new Packet(receivedBuffer);
-                        else
-                           packet = new Packet(receivedBuffer, true);
+                        if(packet.Type == "TCP")
+                        {
+                            var tcpData = packet.GetTCPPacketData();
+                        }
+
 
                         OnNewPacket(packet);
                     }
@@ -97,9 +102,9 @@ namespace SimpleSniffer.BaseClass
                     }
                 }
 
-                if(monitor_Socket != null)  { monitor_Socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(this.OnReceive), null); }
+                if (monitor_Socket != null) { monitor_Socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(this.OnReceive), null); }
             }
-            catch
+            catch(Exception e)
             {
                 stop();
             }

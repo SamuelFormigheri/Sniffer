@@ -4,11 +4,12 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Net;
+using System.Text;
 using System.Windows.Forms;
 
 namespace SimpleSniffer
 {
-    public partial class MainForm:Form
+    public partial class MainForm : Form
     {
         /// <summary>
         /// used to rake the underlying packets;
@@ -86,7 +87,7 @@ namespace SimpleSniffer
                 monitor.newPacketEventHandler += new Monitor.NewPacketEventHandler(onNewPacket);
                 monitorList.Add(monitor);
             }
-            foreach(Monitor monitor in monitorList)
+            foreach (Monitor monitor in monitorList)
             {
                 monitor.start();
             }
@@ -94,7 +95,7 @@ namespace SimpleSniffer
 
         private void onNewPacket(Monitor monitor, Packet p)
         {
-            
+
             this.Invoke(new refresh(onRefresh), p);
             //this.BeginInvoke(new refresh(onRefresh), p);
         }
@@ -128,7 +129,7 @@ namespace SimpleSniffer
             {
                 this.hintLabel.Text = string.Format("Packets received {0}  Total length： [{1} MB]", totalCount, totalLength / (1024 * 1024));
             }
-            else if(totalLength < (long)1024 * 1024 * 1024 * 2)
+            else if (totalLength < (long)1024 * 1024 * 1024 * 2)
             {
                 this.hintLabel.Text = string.Format("Packets received {0}  Total length： [{1} GB]", totalCount, totalLength / (1024 * 1024 * 1024));
             }
@@ -178,7 +179,7 @@ namespace SimpleSniffer
             pList.Add(p);
             this.listView.Items.Add(new ListViewItem(new string[] { p.Src_IP, p.Src_PORT,p.Des_IP, p.Des_PORT,
                         p.Type, p.Time, p.TotalLength.ToString(), p.getCharString()}));
-            this.listView.EnsureVisible(listView.Items.Count > 5? listView.Items.Count - 10:listView.Items.Count);
+            this.listView.EnsureVisible(listView.Items.Count - 1);
         }
 
         /// <summary>
@@ -281,7 +282,7 @@ namespace SimpleSniffer
             ipTextBox.Text = "";
             ipTextBox.GotFocus -= ipTextBox_GotFocus;
         }
-        
+
         /// <summary>
         /// when selecting the list item and present the details at the bottom of the panel;
         /// </summary>
@@ -293,15 +294,57 @@ namespace SimpleSniffer
             if (listView.SelectedItems != null && listView.SelectedItems.Count != 0)
             {
                 Packet p = pList[listView.SelectedItems[0].Index];
-                //MessageBox.Show("charLength:" + p.getCharString().Length + "\n" + "hexLength:" + p.getHexString().Length);
+                var tcpData = p.GetTCPPacketData();
+                if (tcpData != null)
+                    SetTCPDataFields(tcpData);
+                else
+                    this.groupBox1.Controls.OfType<Control>().ToList().ForEach(c => c.Visible = false);
+
                 this.hexTextBox.Text = p.getHexString();
                 this.charTextBox.Text = p.getCharString();
             }
         }
 
+        private void SetTCPDataFields(TCPPacketData tcpData)
+        {
+            this.groupBox1.Controls.OfType<Control>().ToList().ForEach(c => c.Visible = true);
+            this.dest_port.Text = tcpData.DestinyPort;
+            this.src_port.Text = tcpData.SourcePort;
+            this.seq.Text = tcpData.SEQNumber.ToString();
+            this.ack.Text = tcpData.ACKNumber.ToString();
+            this.offset.Text = tcpData.Offset.ToString();
+            this.tcpheader_size.Text = tcpData.TCPHeaderLenght.ToString();
+            this.checksum.Text = "0x" + tcpData.Checksum.ToString("X");
+            this.urgentPointer.Text = tcpData.UrgentPointer.ToString();
+            this.reservedBits.Text = GetReservedBitsString(tcpData.ReservedBits);
+            this.window_size.Text = tcpData.Window.ToString();
+
+            var i = 0;
+
+            this.listOptions.Items.Clear();
+            if (tcpData.Options != null)
+                foreach (var opt in tcpData.Options)
+                {
+                    this.listOptions.Items.Add(new ListViewItem(new string[] { opt.OptionCode.ToString(), opt.OptionLenght.ToString(),
+                opt.OptionDescription, opt.OptionDataString}));
+                }
+
+            foreach (var flag in tcpData.FlagsArray)
+            {
+                this.flags_checks.SetItemChecked(i, flag);
+                i++;
+            }
+        }
+
+        private string GetReservedBitsString(bool[] reservedBits)
+        {
+            var onesAndZeros = reservedBits.Select(b => b ? 1 : 0).ToArray();
+            return $"{onesAndZeros[0]} {onesAndZeros[1]} {onesAndZeros[2]}";
+        }
+
         private void filterCheckBox_CheckedChanged(object sender, EventArgs e)
         {
-            if(this.filterCheckBox.Checked && this.ipTextBox.ForeColor != Color.Black)
+            if (this.filterCheckBox.Checked && this.ipTextBox.ForeColor != Color.Black)
             {
                 this.ipTextBox.Text = "";
                 this.ipTextBox.ForeColor = Color.Black;
@@ -344,7 +387,7 @@ namespace SimpleSniffer
             int count = 0;
             for (int i = 0; i < s.Length; i++)
             {
-                if(s[i] == c)
+                if (s[i] == c)
                 {
                     count++;
                 }
@@ -362,7 +405,7 @@ namespace SimpleSniffer
         {
             List<int> countList = new List<int>();
             int index = 0;///indicate the current index
-            while(s.Contains(s0))
+            while (s.Contains(s0))
             {
                 index = s.IndexOf(s0);
                 s = s.Substring(0, index + s0.Length);
@@ -390,7 +433,7 @@ namespace SimpleSniffer
             int start1 = this.charTextBox.SelectionStart;
 
             int index = 0;
-            if(start0 > -1 && charString.Substring(start0, selectedLength).Equals(selectedString))
+            if (start0 > -1 && charString.Substring(start0, selectedLength).Equals(selectedString))
             {
                 index = start0;
             }
@@ -434,7 +477,7 @@ namespace SimpleSniffer
         /// <param name="e"></param>
         private void charTextBox_MouseClick(object sender, MouseEventArgs e)
         {
-            if(this.charTextBox.SelectedText.Length == 0)
+            if (this.charTextBox.SelectedText.Length == 0)
             {
                 //reset backcolor
                 this.hexTextBox.SelectionStart = 0;
@@ -491,7 +534,7 @@ namespace SimpleSniffer
             Packet p;
             this.listView.Items.Clear();
             pList.Clear();
-            for(int i = 0; i < allList.Count; i++)
+            for (int i = 0; i < allList.Count; i++)
             {
                 p = allList[i];
                 if (isIPOkay(p, conditions[0]) && isPORTOkay(p, conditions[1])
@@ -504,7 +547,7 @@ namespace SimpleSniffer
             }
         }
 
-        
+
         /// <summary>
         /// forbid the user to adjust the width of the listview
         /// </summary>
