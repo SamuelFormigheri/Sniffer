@@ -89,7 +89,9 @@
     <Compile Include="BaseClass\MyRichTextBox.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="BaseClass\PacketBuilder.cs" />
     <Compile Include="BaseClass\PacketV6.cs" />
+    <Compile Include="BaseClass\TCPPacketData.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>

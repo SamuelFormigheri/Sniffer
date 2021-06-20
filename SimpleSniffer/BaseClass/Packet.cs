@@ -6,7 +6,7 @@ namespace SimpleSniffer.BaseClass
 {
     public class Packet
     {
-        private const int LineCount = 30; 
+        private const int LineCount = 30;
 
         /// <summary>
         /// use enumeration to identify the protocol type;
@@ -39,6 +39,7 @@ namespace SimpleSniffer.BaseClass
         /// protocol type of the packet;
         /// </summary>
         private ProtocolType protocolType;
+        private int protocolTypeCode;
 
         private IPAddress src_IPAddress;
 
@@ -47,6 +48,8 @@ namespace SimpleSniffer.BaseClass
         private int src_Port;
 
         private int des_Port;
+
+        private bool isIPV6;
 
         private int totalLength;
 
@@ -78,7 +81,7 @@ namespace SimpleSniffer.BaseClass
                 throw new ArgumentException();
             raw_Packet = raw;
             dateTime = DateTime.Now;///the time sniffed the packet;
-                                    
+
             ///get the headlength in the packet;
             headLength = (raw[0] & 0x0F) * 4;
             if ((raw[0] & 0x0F) < 5)
@@ -92,7 +95,10 @@ namespace SimpleSniffer.BaseClass
             if (Enum.IsDefined(typeof(ProtocolType), (int)raw[9]))
                 protocolType = (ProtocolType)raw[9];
             else
+            {
+                System.Windows.Forms.MessageBox.Show($"{(int)raw[9]}");
                 protocolType = ProtocolType.OTHERS;
+            }
 
             src_IPAddress = new IPAddress(BitConverter.ToUInt32(raw, 12));
             des_IPAddress = new IPAddress(BitConverter.ToUInt32(raw, 16));
@@ -117,8 +123,10 @@ namespace SimpleSniffer.BaseClass
                 src_Port = -1;
                 des_Port = -1;
             }
-            
+
         }
+
+        private static System.Collections.Generic.List<int> otherprotocols = new System.Collections.Generic.List<int>();
 
         /// <summary>
         /// using the raw and current system time to initialize the packet;
@@ -137,6 +145,7 @@ namespace SimpleSniffer.BaseClass
 
             PacketV6 ipv6Data = new PacketV6();
             ipv6Data = ipv6Data.Create(raw);
+            this.isIPV6 = isIpv6;
 
             raw_Packet = raw;
             dateTime = DateTime.Now;
@@ -159,9 +168,22 @@ namespace SimpleSniffer.BaseClass
                     break;
                 default:
                     protocolType = ProtocolType.OTHERS;
+                    if (!otherprotocols.Contains(ipv6Data.ipNextHeader))
+                        otherprotocols.Add(ipv6Data.ipNextHeader);
                     break;
             }
 
+        }
+
+
+        public TCPPacketData GetTCPPacketData()
+        {
+            if (this.protocolType != ProtocolType.TCP)
+                return null;
+
+            var tcpData = new TCPPacketData(this, raw_Packet, isIPV6);
+
+            return tcpData;
         }
 
 
@@ -264,7 +286,7 @@ namespace SimpleSniffer.BaseClass
                 }
                 sb.Append("\n");
             }
-                return sb.ToString();
+            return sb.ToString();
         }
 
         /// <summary>
@@ -275,8 +297,8 @@ namespace SimpleSniffer.BaseClass
         {
 
             StringBuilder sb = new StringBuilder();
-            
-            for(int i = this.HeadLength; i < TotalLength; i += LineCount)
+
+            for (int i = this.HeadLength; i < TotalLength; i += LineCount)
             {
                 for (int j = i; j < TotalLength && j < i + LineCount; j++)
                 {
